@@ -1,6 +1,6 @@
 import type { SavePayload, Underwriting } from "@/lib/api/types";
 import { DEAL_TAGS, emptyTags } from "./tags";
-import { checkNumber, FIELD_SPECS, initialValues, type NumberFieldKey, type WorkspaceValues } from "./schema";
+import { checkNumber, FIELD_SPECS, initialValues, LINE_ITEM_SPEC, type NumberFieldKey, type WorkspaceValues } from "./schema";
 import { fractionToPct, moneyToText, pctToFraction, textToMoney } from "./percent";
 
 const valid = (values: WorkspaceValues, keys: NumberFieldKey[]) =>
@@ -46,11 +46,11 @@ export function toPayload(v: WorkspaceValues): SavePayload {
   }
 
   payload.optimization_items = v.optimization
-    .filter((r) => r.category.trim() && checkNumber(r.amount, { label: "", min: 0 }) === null)
+    .filter((r) => r.category.trim() && checkNumber(r.amount, LINE_ITEM_SPEC) === null)
     .map((r) => ({ category: r.category.trim(), total_price: textToMoney(r.amount) }));
 
   payload.operating_expenses = v.opex
-    .filter((r) => r.name.trim() && checkNumber(r.monthly, { label: "", min: 0 }) === null)
+    .filter((r) => r.name.trim() && checkNumber(r.monthly, LINE_ITEM_SPEC) === null)
     .map((r) => ({ expense_name: r.name.trim(), monthly_amount: textToMoney(r.monthly) }));
 
   payload.tags = { ...v.tags };

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useWatch, type Control } from "react-hook-form";
 import { toPayload } from "@/lib/underwriting/mappers";
-import type { WorkspaceValues } from "@/lib/underwriting/schema";
+import { storageIssues, type WorkspaceValues } from "@/lib/underwriting/schema";
 import type { SavePayload, Underwriting } from "@/lib/api/types";
 
 export type SaveStatus = "saved" | "dirty" | "saving" | "error";
@@ -28,6 +28,10 @@ export function useAutosave({
   const key = useMemo(() => JSON.stringify(toPayload(values)), [values]);
   const keyRef = useRef(key);
   keyRef.current = key;
+  // Calculated values the API can't store would make every save a 500; hold saves until they're fixed.
+  const blocked = useMemo(() => storageIssues(values).length > 0, [values]);
+  const blockedRef = useRef(blocked);
+  blockedRef.current = blocked;
   const lastSaved = useRef(JSON.stringify(toPayload(initial)));
   const inFlight = useRef<Promise<void> | null>(null);
 
@@ -38,6 +42,10 @@ export function useAutosave({
     // Serialize saves so an older response can't overwrite a newer one.
     if (inFlight.current) await inFlight.current;
     const sending = keyRef.current;
+    if (blockedRef.current) {
+      setStatus(sending === lastSaved.current ? "saved" : "dirty");
+      return false;
+    }
     if (sending === lastSaved.current) {
       setStatus("saved");
       return true;
@@ -63,9 +71,10 @@ export function useAutosave({
   useEffect(() => {
     if (key === lastSaved.current) return;
     setStatus((s) => (s === "saving" ? s : "dirty"));
+    if (blocked) return;
     const t = setTimeout(() => void flush(), delay);
     return () => clearTimeout(t);
-  }, [key, delay, flush]);
+  }, [key, blocked, delay, flush]);
 
   // Don't let someone close the tab with work the server hasn't accepted.
   useEffect(() => {

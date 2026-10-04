@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { FieldErrors, Resolver } from "react-hook-form";
 import { emptyTags, type TagValues } from "./tags";
 import { parseNumber } from "./percent";
+import { compute } from "./calc";
 
 /**
  * Form state keeps every number as the text the trainee typed. That keeps
@@ -78,7 +79,17 @@ interface NumSpec {
   /** Strictly greater than this value. */
   gt?: number;
   integer?: boolean;
+  /** Format limits as dollars in messages. */
+  money?: boolean;
 }
+
+/**
+ * Upper limits keep every value the API stores inside its columns: money is
+ * NUMERIC(12,2) (under $10B), so a larger value makes the API fail with a 500.
+ */
+const PRICE_MAX = 100_000_000;
+const REVENUE_MAX = 100_000_000;
+export const LINE_ITEM_SPEC: NumSpec = { label: "Amount", min: 0, max: 10_000_000, money: true };
 
 export type NumberFieldKey =
   | "purchasePrice"
@@ -97,7 +108,7 @@ export type NumberFieldKey =
   | "appreciationPct";
 
 export const FIELD_SPECS: Record<NumberFieldKey, NumSpec> = {
-  purchasePrice: { label: "Purchase price", gt: 0 },
+  purchasePrice: { label: "Purchase price", gt: 0, max: PRICE_MAX, money: true },
   downPaymentPct: { label: "Down payment %", min: 0, max: 100 },
   interestRate: { label: "Interest rate %", min: 0, max: 100 },
   mortgageYears: { label: "Loan term (years)", gt: 0, max: 50, integer: true },
@@ -106,9 +117,9 @@ export const FIELD_SPECS: Record<NumberFieldKey, NumSpec> = {
   slaPct: { label: "Short-life asset multiplier %", min: 0, max: 100 },
   bonusPct: { label: "Bonus depreciation %", min: 0, max: 100 },
   taxRatePct: { label: "Tax rate %", min: 0, max: 100 },
-  lowRevenue: { label: "Low revenue", min: 0 },
-  midRevenue: { label: "Mid revenue", min: 0 },
-  highRevenue: { label: "High revenue", min: 0 },
+  lowRevenue: { label: "Low revenue", min: 0, max: REVENUE_MAX, money: true },
+  midRevenue: { label: "Mid revenue", min: 0, max: REVENUE_MAX, money: true },
+  highRevenue: { label: "High revenue", min: 0, max: REVENUE_MAX, money: true },
   coHostingFeePct: { label: "Co-hosting fee %", min: 0, max: 100 },
   appreciationPct: { label: "Annual appreciation %", min: 0, max: 100 },
 };
@@ -145,6 +156,18 @@ export const SECTION_FIELDS: Record<SectionId, (keyof WorkspaceValues)[]> = {
   tags: [],
 };
 
+/**
+ * Cross-field rules attach their error to one field, but RHF only re-validates
+ * the field being edited. Leaving a field here re-checks these dependents too.
+ */
+export const FIELD_DEPS: Partial<Record<NumberFieldKey, NumberFieldKey[]>> = {
+  lowRevenue: ["midRevenue", "highRevenue"],
+  midRevenue: ["lowRevenue", "highRevenue"],
+  highRevenue: ["lowRevenue", "midRevenue"],
+  purchasePrice: ["downPaymentPct"],
+  closingCostsPct: ["downPaymentPct"],
+};
+
 export function labelFor(path: string): string {
   const [head, index, leaf] = path.split(".");
   if (head && head in FIELD_SPECS) return FIELD_SPECS[head as NumberFieldKey].label;
@@ -167,8 +190,39 @@ export function checkNumber(text: string, spec: NumSpec): string | null {
   if (spec.integer && !Number.isInteger(n)) return "Use a whole number";
   if (spec.gt != null && n <= spec.gt) return `Must be greater than ${spec.gt}`;
   if (spec.min != null && n < spec.min) return spec.max != null ? `Must be between ${spec.min} and ${spec.max}` : `Can't be below ${spec.min}`;
-  if (spec.max != null && n > spec.max) return spec.min != null ? `Must be between ${spec.min} and ${spec.max}` : `Can't exceed ${spec.max}`;
+  if (spec.max != null && n > spec.max) {
+    if (spec.money) return `Can't exceed $${spec.max.toLocaleString("en-US")}`;
+    return spec.min != null ? `Must be between ${spec.min} and ${spec.max}` : `Can't exceed ${spec.max}`;
+  }
   return null;
+}
+
+/** NUMERIC(6,4) columns (PRR, OOP ÷ price, Cash-on-Cash) hold fractions below 100, i.e. 10,000%. */
+const RATIO_LIMIT = 99.9999;
+const MONEY_LIMIT = 9_999_999_999.99;
+
+/**
+ * Calculated values the API would fail to store, even though every input is
+ * individually valid. Saving is blocked while any of these are present.
+ */
+export function storageIssues(values: WorkspaceValues): { path: NumberFieldKey; message: string }[] {
+  const c = compute(values);
+  const price = parseNumber(values.purchasePrice);
+  const out: { path: NumberFieldKey; message: string }[] = [];
+  const oop = c.totalOutOfPocket;
+  if (oop != null && oop > MONEY_LIMIT) {
+    out.push({ path: "purchasePrice", message: "Total out of pocket is too large to save. Check the price and setup costs" });
+  } else if (oop != null && price > 0 && oop / price > RATIO_LIMIT) {
+    out.push({ path: "purchasePrice", message: "Total out of pocket is over 100× the price. Check the price and setup costs" });
+  }
+  if (c.prr != null && c.prr > RATIO_LIMIT) {
+    out.push({ path: "midRevenue", message: "Mid revenue is over 100× the purchase price. Check both numbers" });
+  }
+  const scenarios = Object.values(c.scenarios);
+  if (scenarios.some((s) => s.cashOnCash != null && Math.abs(s.cashOnCash) > RATIO_LIMIT)) {
+    out.push({ path: "downPaymentPct", message: "Cash-on-Cash would pass 10,000%. Out of pocket is too small for this revenue" });
+  }
+  return out;
 }
 
 const numberText = (spec: NumSpec) =>
@@ -185,7 +239,7 @@ const moneyRow = <K extends string, L extends string>(textKey: K, amountKey: L, 
       const amount = (row[amountKey] ?? "").trim();
       if (!text && !amount) return; // blank rows are ignored
       if (!text) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [textKey], message: `${textLabel} is required` });
-      const msg = checkNumber(amount, { label: amountLabel, min: 0 });
+      const msg = checkNumber(amount, { ...LINE_ITEM_SPEC, label: amountLabel });
       if (msg) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [amountKey], message: msg });
     });
 
@@ -235,6 +289,9 @@ export const workspaceSchema = z
         });
       }
     }
+    for (const issue of storageIssues(v as WorkspaceValues)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [issue.path], message: issue.message });
+    }
   });
 
 export interface Issue {
@@ -280,6 +337,12 @@ export const workspaceResolver: Resolver<WorkspaceValues> = async (values) => {
   const issues = validateWorkspace(values);
   if (issues.length === 0) return { values, errors: {} };
   const errors: Record<string, unknown> = {};
-  for (const issue of issues) setIn(errors, issue.path, { type: "validation", message: issue.message });
+  // Keep the first message per field: field-level rules come before cross-field ones and are more specific.
+  const seen = new Set<string>();
+  for (const issue of issues) {
+    if (seen.has(issue.path)) continue;
+    seen.add(issue.path);
+    setIn(errors, issue.path, { type: "validation", message: issue.message });
+  }
   return { values: {}, errors: errors as FieldErrors<WorkspaceValues> };
 };
