@@ -5,6 +5,7 @@ import { compute, type ScenarioKey } from "@/lib/underwriting/calc";
 import { money, percent, ratio } from "@/lib/underwriting/format";
 import type { WorkspaceValues } from "@/lib/underwriting/schema";
 import { cn } from "@/lib/utils";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { NumberField, SectionCard } from "./fields";
 
 const COLUMNS: { key: ScenarioKey; label: string }[] = [
@@ -59,41 +60,41 @@ export function AnalysisSection() {
           <Stat label="PRR" value={ratio(c.prr, 3)} hint="Mid revenue ÷ purchase price" />
         </dl>
 
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[32rem] text-sm">
-            <caption className="sr-only">Calculated returns by revenue scenario</caption>
-            <thead>
-              <tr className="border-b bg-muted/60 text-left">
-                <th scope="col" className="px-4 py-2 font-medium text-muted-foreground">
+        <div className="rounded-lg border">
+          <Table className="min-w-[32rem]">
+            <TableCaption className="sr-only">Calculated returns by revenue scenario</TableCaption>
+            <TableHeader>
+              <TableRow className="bg-muted/60 hover:bg-muted/60">
+                <TableHead scope="col" className="px-4 text-muted-foreground">
                   Metric
-                </th>
+                </TableHead>
                 {COLUMNS.map((col) => (
-                  <th key={col.key} scope="col" className={cn("px-4 py-2 text-right font-medium", col.key === "mid" ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
+                  <TableHead key={col.key} scope="col" className={cn("px-4 text-right", col.key === "mid" ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
                     {col.label}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {rows.map((row) => (
-                <tr key={row.label}>
-                  <th scope="row" className="px-4 py-2 text-left font-normal">
+                <TableRow key={row.label}>
+                  <TableHead scope="row" className="h-auto px-4 py-2 font-normal whitespace-normal">
                     <span className={row.strong ? "font-medium" : ""}>{row.label}</span>
                     {row.hint && <span className="block text-xs text-muted-foreground">{row.hint}</span>}
-                  </th>
+                  </TableHead>
                   {COLUMNS.map((col) => (
-                    <td
+                    <TableCell
                       key={col.key}
                       data-testid={`${row.label.toLowerCase().replace(/[^a-z]+/g, "-")}-${col.key}`}
-                      className={cn("px-4 py-2 text-right tabular", col.key === "mid" && "bg-accent/40", row.strong && "font-semibold")}
+                      className={cn("px-4 text-right tabular", col.key === "mid" && "bg-accent/40", row.strong && "font-semibold")}
                     >
                       {row.get(col.key)}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </SectionCard>
     </div>

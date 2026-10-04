@@ -6,7 +6,7 @@ import type { DashboardProperty, TrainingStatus } from "@/lib/api/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ErrorState } from "@/components/domain";
 import { num } from "@/lib/underwriting/format";
 import { PropertyCard } from "./property-card";
@@ -80,43 +80,39 @@ export function DashboardView() {
         </Card>
       </section>
 
-      <div role="tablist" aria-label="Filter cases" className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            role="tab"
-            aria-selected={filter === f.id}
-            onClick={() => setFilter(f.id)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-sm transition-colors",
-              filter === f.id ? "border-primary bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}
-          >
-            {f.label}
-            <span className="ml-1.5 tabular opacity-70">{isPending ? "" : counts(f.id)}</span>
-          </button>
-        ))}
-      </div>
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)} className="gap-4">
+        <TabsList aria-label="Filter cases" className="max-w-full justify-start overflow-x-auto">
+          {FILTERS.map((f) => (
+            <TabsTrigger key={f.id} value={f.id} className="flex-none px-3">
+              {f.label}
+              <span className="tabular text-muted-foreground">{isPending ? "" : counts(f.id)}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {isPending ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-80 rounded-xl" />
-          ))}
-        </div>
-      ) : visible.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">No cases match this filter.</CardContent>
-        </Card>
-      ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Training cases">
-          {visible.map((p: DashboardProperty) => (
-            <li key={p.zpid}>
-              <PropertyCard property={p} />
-            </li>
-          ))}
-        </ul>
-      )}
+        {/* One panel, re-filtered per tab, so the grid isn't rendered four times. */}
+        <TabsContent value={filter}>
+          {isPending ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-80 rounded-xl" />
+              ))}
+            </div>
+          ) : visible.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">No cases match this filter.</CardContent>
+            </Card>
+          ) : (
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-label="Training cases">
+              {visible.map((p: DashboardProperty) => (
+                <li key={p.zpid}>
+                  <PropertyCard property={p} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
