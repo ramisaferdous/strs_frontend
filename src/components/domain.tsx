@@ -1,5 +1,7 @@
-import { CheckCircle2, CircleDashed, PencilLine } from "lucide-react";
+import { AlertCircle, CheckCircle2, CircleDashed, PencilLine } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Rating, TrainingStatus } from "@/lib/api/types";
 
 export const RATING_COPY: Record<Rating, { label: string; band: string }> = {
@@ -37,14 +39,17 @@ export function StatusBadge({ status }: { status: TrainingStatus }) {
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div role="alert" data-testid="error-state" className="rounded-xl border border-low/30 bg-low-soft p-6 text-sm">
-      <p className="font-medium text-low">Something went wrong</p>
-      <p className="mt-1 text-muted-foreground">{message}</p>
-      {onRetry && (
-        <button onClick={onRetry} className="mt-3 text-sm font-medium text-primary underline-offset-4 hover:underline">
-          Try again
-        </button>
-      )}
-    </div>
+    <Alert data-testid="error-state" className="border-low/30 bg-low-soft p-6 text-low">
+      <AlertCircle aria-hidden />
+      <AlertTitle>Something went wrong</AlertTitle>
+      <AlertDescription>
+        <p>{message}</p>
+        {onRetry && (
+          <Button variant="link" size="sm" onClick={onRetry} className="mt-2 h-auto px-0">
+            Try again
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
   );
 }
