@@ -73,9 +73,17 @@ function Marker({ left, label, tone, side }: { left: number; label: string; tone
     </span>
   );
   const line = <span className={cn("h-7 w-0.5 shrink-0", tone === "you" ? "bg-primary" : "bg-foreground")} />;
+  // Near either end, pin the chip to that edge so it grows inwards instead of spilling out of the card.
+  const align = left < 12 ? "start" : left > 88 ? "end" : "center";
   return (
     <div
-      className={cn("absolute flex -translate-x-1/2 flex-col items-center", side === "above" ? "top-0" : "top-[1.25rem]")}
+      className={cn(
+        "absolute flex flex-col",
+        align === "start" && "items-start",
+        align === "center" && "-translate-x-1/2 items-center",
+        align === "end" && "-translate-x-full items-end",
+        side === "above" ? "top-0" : "top-[1.25rem]",
+      )}
       style={{ left: `${left}%` }}
       aria-hidden
     >
