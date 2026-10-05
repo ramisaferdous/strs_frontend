@@ -3,7 +3,6 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const CI = !!process.env.CI;
 
-// Optional: point Playwright at a Chromium you already have (e.g. in a locked-down sandbox).
 const executablePath = process.env.PW_CHROMIUM_PATH;
 const extraArgs: string[] = process.env.PW_CHROMIUM_ARGS ? JSON.parse(process.env.PW_CHROMIUM_ARGS) : [];
 
