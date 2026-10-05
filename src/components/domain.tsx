@@ -31,7 +31,7 @@ export function StatusBadge({ status }: { status: TrainingStatus }) {
     );
   }
   return (
-    <Badge variant="outline">
+    <Badge variant="outline" className="bg-card text-muted-foreground">
       <CircleDashed aria-hidden /> Not started
     </Badge>
   );
