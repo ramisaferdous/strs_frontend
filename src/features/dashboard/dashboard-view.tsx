@@ -81,7 +81,7 @@ export function DashboardView() {
       </section>
 
       <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)} className="gap-4">
-        <TabsList aria-label="Filter cases" className="max-w-full justify-start overflow-x-auto">
+        <TabsList aria-label="Filter cases" className="max-w-full justify-start overflow-x-auto overflow-y-hidden">
           {FILTERS.map((f) => (
             <TabsTrigger key={f.id} value={f.id} className="flex-none px-3">
               {f.label}
